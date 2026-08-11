@@ -2,10 +2,12 @@
 __pycache__/
 *.pyc
 
-dataset/
-saved_models/
-
-results/
 .ipynb_checkpoints/
 
+data/
+models/
+outputs/checkpoints/
+
 .env
+.DS_Store
+Thumbs.db
