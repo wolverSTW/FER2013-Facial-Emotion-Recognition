@@ -1,1 +1,0 @@
-print("FER2013 project environment is working!")
