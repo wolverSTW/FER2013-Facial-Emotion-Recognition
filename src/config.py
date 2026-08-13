@@ -146,12 +146,12 @@ IMAGE_SIZE = 224
 
 # Number of images processed in one training step.
 
-BATCH_SIZE = 32
+BATCH_SIZE = 64
 
 
 # Number of CPU worker processes used by DataLoader.
 
-NUM_WORKERS = 2
+NUM_WORKERS = 4
 
 
 # ============================================================
