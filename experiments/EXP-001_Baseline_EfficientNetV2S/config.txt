@@ -1,0 +1,95 @@
+Experiment ID:
+EXP-001
+
+Model:
+EfficientNetV2-S
+
+Dataset:
+FER2013
+
+Framework:
+PyTorch
+
+Input Size:
+224 x 224 x 3
+
+Pretrained:
+ImageNet
+
+Classes:
+7
+
+Classes:
+angry
+disgust
+fear
+happy
+neutral
+sad
+surprise
+
+
+Training Split:
+90% Training
+10% Validation
+
+Test:
+Official FER2013 Test Set
+
+
+Optimizer:
+AdamW
+
+Learning Rate:
+0.0001
+
+Weight Decay:
+0.0001
+
+Scheduler:
+CosineAnnealingLR
+
+Loss:
+CrossEntropyLoss
+
+
+Batch Size:
+32
+
+Epochs:
+30
+
+Early Stopping:
+5
+
+
+Hardware:
+NVIDIA RTX 4090
+
+
+CUDA:
+12.8
+
+
+PyTorch:
+2.8.0
+
+
+Python:
+3.12
+
+
+Best Epoch:
+23
+
+
+Best Validation Accuracy:
+70.73%
+
+
+Test Accuracy:
+70.99%
+
+
+Weighted F1:
+70.90%

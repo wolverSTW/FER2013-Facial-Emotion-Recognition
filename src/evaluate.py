@@ -2,30 +2,38 @@
 FER2013 Facial Emotion Recognition
 ==================================
 
-This module evaluates the best trained model on the
-official FER2013 test dataset.
+Final evaluation pipeline.
 
-Evaluation metrics:
-    - Test loss
-    - Test accuracy
-    - Precision
-    - Recall
-    - F1-score
-    - Confusion matrix
-    - Per-class classification report
+Features:
+- Evaluate best trained model
+- Official FER2013 test set
+- Accuracy
+- Precision
+- Recall
+- F1-score
+- Classification report
+- Confusion matrix
+- Save JSON result
+- Save TXT report
+- Update Excel experiment tracker
 
-The official FER2013 test set is used ONLY for final evaluation.
 """
+
 
 # ============================================================
 # 1. IMPORT LIBRARIES
 # ============================================================
 
+
 import json
+
+from pathlib import Path
+
 
 import torch
 
 from torch import nn
+
 
 from sklearn.metrics import (
     accuracy_score,
@@ -34,9 +42,23 @@ from sklearn.metrics import (
     precision_recall_fscore_support,
 )
 
+
+from openpyxl import (
+    Workbook,
+    load_workbook,
+)
+
+
+from openpyxl.utils import (
+    get_column_letter,
+)
+
+
+
 # ============================================================
-# 2. IMPORT PROJECT MODULES
+# 2. PROJECT IMPORTS
 # ============================================================
+
 
 from src.config import (
     DEVICE,
@@ -44,206 +66,632 @@ from src.config import (
     CLASS_NAMES,
 )
 
+
 from src.dataset import (
     load_datasets,
     validate_class_mapping,
     create_dataloaders,
 )
 
+
 from src.model import create_model
 
 
+
+
 # ============================================================
-# 3. EVALUATE MODEL
+# 3. EVALUATION FUNCTION
 # ============================================================
+
 
 @torch.no_grad()
 def evaluate_model(
-    model: nn.Module,
+    model,
     test_loader,
-    device: torch.device,
+    device,
 ):
-    """
-    Evaluate the trained model on the official FER2013
-    test dataset.
-
-    Returns
-    -------
-    dict
-        Evaluation results.
-    """
-
-    # --------------------------------------------------------
-    # Set model to evaluation mode.
-    # --------------------------------------------------------
 
     model.eval()
 
-    # --------------------------------------------------------
-    # Loss function.
-    # --------------------------------------------------------
 
     criterion = nn.CrossEntropyLoss()
 
-    # --------------------------------------------------------
-    # Statistics.
-    # --------------------------------------------------------
 
     running_loss = 0.0
 
     total_samples = 0
 
-    all_predictions = []
 
-    all_labels = []
+    predictions_all = []
 
-    # ========================================================
-    # Process test batches
-    # ========================================================
+    labels_all = []
+
+
 
     for images, labels in test_loader:
 
-        # ----------------------------------------------------
-        # Move data to device.
-        # ----------------------------------------------------
 
         images = images.to(
-            device,
-            non_blocking=True,
+            device
         )
+
 
         labels = labels.to(
-            device,
-            non_blocking=True,
+            device
         )
 
-        # ----------------------------------------------------
-        # Forward pass.
-        # ----------------------------------------------------
 
-        outputs = model(images)
+        outputs = model(
+            images
+        )
 
-        # ----------------------------------------------------
-        # Calculate loss.
-        # ----------------------------------------------------
 
         loss = criterion(
             outputs,
-            labels,
+            labels
         )
 
-        # ----------------------------------------------------
-        # Accumulate loss.
-        # ----------------------------------------------------
 
         running_loss += (
             loss.item()
-            * images.size(0)
+            *
+            images.size(0)
         )
 
-        total_samples += labels.size(0)
 
-        # ----------------------------------------------------
-        # Get predictions.
-        # ----------------------------------------------------
+        total_samples += (
+            labels.size(0)
+        )
+
+
 
         predictions = outputs.argmax(
             dim=1
         )
 
-        # ----------------------------------------------------
-        # Store predictions and labels.
-        # ----------------------------------------------------
 
-        all_predictions.extend(
+        predictions_all.extend(
             predictions.cpu().numpy()
         )
 
-        all_labels.extend(
+
+        labels_all.extend(
             labels.cpu().numpy()
         )
 
-    # ========================================================
-    # Calculate test loss
-    # ========================================================
+
 
     test_loss = (
         running_loss
-        / total_samples
+        /
+        total_samples
     )
 
-    # ========================================================
-    # Calculate accuracy
-    # ========================================================
 
-    test_accuracy = accuracy_score(
-        all_labels,
-        all_predictions,
+
+    accuracy = accuracy_score(
+        labels_all,
+        predictions_all
     )
 
-    # ========================================================
-    # Precision / Recall / F1
-    # ========================================================
 
     precision, recall, f1, _ = (
         precision_recall_fscore_support(
-            all_labels,
-            all_predictions,
+            labels_all,
+            predictions_all,
             average="weighted",
-            zero_division=0,
+            zero_division=0
         )
     )
 
-    # ========================================================
-    # Per-class metrics
-    # ========================================================
 
     report = classification_report(
-        all_labels,
-        all_predictions,
+        labels_all,
+        predictions_all,
         target_names=CLASS_NAMES,
         output_dict=True,
-        zero_division=0,
+        zero_division=0
     )
 
-    # ========================================================
-    # Confusion matrix
-    # ========================================================
 
     cm = confusion_matrix(
-        all_labels,
-        all_predictions,
+        labels_all,
+        predictions_all
     )
 
-    # ========================================================
-    # Create results dictionary
-    # ========================================================
 
-    results = {
-        "test_loss": float(test_loss),
-        "test_accuracy": float(test_accuracy),
-        "weighted_precision": float(precision),
-        "weighted_recall": float(recall),
-        "weighted_f1": float(f1),
-        "classification_report": report,
-        "confusion_matrix": cm.tolist(),
+
+    return {
+
+
+        "test_loss":
+            float(test_loss),
+
+
+        "test_accuracy":
+            float(accuracy),
+
+
+        "weighted_precision":
+            float(precision),
+
+
+        "weighted_recall":
+            float(recall),
+
+
+        "weighted_f1":
+            float(f1),
+
+
+        "classification_report":
+            report,
+
+
+        "confusion_matrix":
+            cm.tolist()
+
     }
 
-    return results
+
+# ============================================================
+# 4. SAVE JSON RESULTS
+# ============================================================
+
+
+def save_json_results(results):
+
+    results_dir = (
+        MODEL_DIR.parent
+        /
+        "results"
+    )
+
+
+    results_dir.mkdir(
+        parents=True,
+        exist_ok=True
+    )
+
+
+    path = (
+        results_dir
+        /
+        "evaluation_results.json"
+    )
+
+
+    with open(
+        path,
+        "w",
+        encoding="utf-8"
+    ) as file:
+
+
+        json.dump(
+            results,
+            file,
+            indent=4
+        )
+
+
+    print(
+        "JSON saved:"
+    )
+
+    print(
+        path
+    )
+
+
+
 
 
 # ============================================================
-# 4. MAIN
+# 5. SAVE TEXT RESULTS
 # ============================================================
 
-def main() -> None:
-    """
-    Run final evaluation on the official FER2013 test set.
-    """
 
-    # ========================================================
-    # Display header
-    # ========================================================
+def save_text_results(results):
+
+
+    results_dir = (
+        MODEL_DIR.parent
+        /
+        "results"
+    )
+
+
+    path = (
+        results_dir
+        /
+        "test_results.txt"
+    )
+
+
+    report = results[
+        "classification_report"
+    ]
+
+
+
+    with open(
+        path,
+        "w",
+        encoding="utf-8"
+    ) as file:
+
+
+        file.write(
+            "FER2013 FINAL TEST RESULTS\n"
+        )
+
+        file.write(
+            "=" * 60
+            +
+            "\n\n"
+        )
+
+
+        file.write(
+            f"Test Loss       : "
+            f"{results['test_loss']:.4f}\n"
+        )
+
+
+        file.write(
+            f"Test Accuracy   : "
+            f"{results['test_accuracy']:.4f}\n"
+        )
+
+
+        file.write(
+            f"Precision       : "
+            f"{results['weighted_precision']:.4f}\n"
+        )
+
+
+        file.write(
+            f"Recall          : "
+            f"{results['weighted_recall']:.4f}\n"
+        )
+
+
+        file.write(
+            f"F1 Score        : "
+            f"{results['weighted_f1']:.4f}\n\n"
+        )
+
+
+        file.write(
+            "CLASS PERFORMANCE\n"
+        )
+
+        file.write(
+            "-" * 60
+            +
+            "\n"
+        )
+
+
+        for cls in CLASS_NAMES:
+
+
+            data = report[cls]
+
+
+            file.write(
+
+                f"{cls:<12}"
+                f"{data['precision']:.4f}   "
+                f"{data['recall']:.4f}   "
+                f"{data['f1-score']:.4f}   "
+                f"{int(data['support'])}\n"
+
+            )
+
+
+
+    print(
+        "Text result saved:"
+    )
+
+    print(
+        path
+    )
+
+
+
+
+
+# ============================================================
+# 6. SAVE CONFUSION MATRIX
+# ============================================================
+
+
+def save_confusion_matrix(results):
+
+
+    path = (
+        MODEL_DIR.parent
+        /
+        "results"
+        /
+        "confusion_matrix.txt"
+    )
+
+
+
+    with open(
+        path,
+        "w",
+        encoding="utf-8"
+    ) as file:
+
+
+        file.write(
+            "Classes:\n"
+        )
+
+
+        file.write(
+            str(CLASS_NAMES)
+        )
+
+
+        file.write(
+            "\n\n"
+        )
+
+
+        file.write(
+            "Confusion Matrix:\n"
+        )
+
+
+        for row in results[
+            "confusion_matrix"
+        ]:
+
+
+            file.write(
+                str(row)
+                +
+                "\n"
+            )
+
+
+
+    print(
+        "Confusion matrix saved:"
+    )
+
+    print(
+        path
+    )
+
+
+
+
+
+# ============================================================
+# 7. UPDATE EXCEL TRACKER
+# ============================================================
+
+
+def update_excel_tracker(results):
+
+
+    excel_path = (
+        MODEL_DIR.parent.parent
+        /
+        "FER2013_Experiment_Tracking.xlsx"
+    )
+
+
+    if not excel_path.exists():
+
+
+        wb = Workbook()
+
+
+        ws = wb.active
+
+        ws.title = (
+            "Experiment Summary"
+        )
+
+
+        ws.append([
+
+            "Experiment ID",
+            "Model",
+            "Dataset",
+            "Epochs",
+            "Optimizer",
+            "Learning Rate",
+            "Weight Decay",
+            "GPU",
+            "Best Epoch",
+            "Validation Accuracy",
+            "Test Accuracy",
+            "Precision",
+            "Recall",
+            "F1 Score"
+
+        ])
+
+
+
+        ws2 = wb.create_sheet(
+            "Class Performance"
+        )
+
+
+        ws2.append([
+
+            "Experiment ID",
+            "Class",
+            "Precision",
+            "Recall",
+            "F1 Score",
+            "Support"
+
+        ])
+
+
+
+        wb.save(
+            excel_path
+        )
+
+
+
+
+
+    wb = load_workbook(
+        excel_path
+    )
+
+
+
+    # Summary sheet
+
+    ws = wb[
+        "Experiment Summary"
+    ]
+
+
+
+    ws.append([
+
+        "EXP-001",
+
+        "EfficientNetV2-S",
+
+        "FER2013",
+
+        28,
+
+        "AdamW",
+
+        0.0001,
+
+        0.0001,
+
+        torch.cuda.get_device_name(0)
+        if torch.cuda.is_available()
+        else "CPU",
+
+        23,
+
+        0.7073,
+
+        results["test_accuracy"],
+
+        results["weighted_precision"],
+
+        results["weighted_recall"],
+
+        results["weighted_f1"]
+
+    ])
+
+
+
+
+    # Class sheet
+
+
+    ws = wb[
+        "Class Performance"
+    ]
+
+
+    report = results[
+        "classification_report"
+    ]
+
+
+
+    for cls in CLASS_NAMES:
+
+
+        ws.append([
+
+
+            "EXP-001",
+
+            cls,
+
+            report[cls]["precision"],
+
+            report[cls]["recall"],
+
+            report[cls]["f1-score"],
+
+            report[cls]["support"]
+
+        ])
+
+
+
+
+
+    # Auto column width
+
+
+    for sheet in wb:
+
+
+        for column in sheet.columns:
+
+
+            max_length = max(
+
+                len(str(cell.value))
+                if cell.value
+                else 0
+
+                for cell in column
+
+            )
+
+
+            sheet.column_dimensions[
+                get_column_letter(
+                    column[0].column
+                )
+            ].width = (
+                max_length + 3
+            )
+
+
+
+    wb.save(
+        excel_path
+    )
+
+
+    print(
+        "Excel tracker updated:"
+    )
+
+    print(
+        excel_path
+    )
+
+
+
+
+
+# ============================================================
+# 8. MAIN
+# ============================================================
+
+
+def main():
+
 
     print()
 
@@ -255,11 +703,14 @@ def main() -> None:
 
     print("=" * 70)
 
+
+
     print()
 
     print(
-        f"Using device: {DEVICE}"
+        f"Device: {DEVICE}"
     )
+
 
     if torch.cuda.is_available():
 
@@ -268,137 +719,107 @@ def main() -> None:
             f"{torch.cuda.get_device_name(0)}"
         )
 
-        print(
-            f"CUDA Version: "
-            f"{torch.version.cuda}"
-        )
 
-    else:
 
-        print(
-            "GPU: Not available"
-        )
+    # Load dataset
+
 
     print()
 
-    # ========================================================
-    # Load datasets
-    # ========================================================
-
     print(
-        "Loading FER2013 datasets..."
+        "Loading datasets..."
     )
+
 
     train_dataset, test_dataset = (
         load_datasets()
     )
 
-    # ========================================================
-    # Validate class mapping
-    # ========================================================
+
 
     validate_class_mapping(
         train_dataset,
-        test_dataset,
+        test_dataset
     )
 
-    print(
-        "Class mapping: OK"
-    )
 
-    print()
 
-    print(
-        f"Official test samples: "
-        f"{len(test_dataset):,}"
-    )
+    (
+        _,
+        _,
+        test_loader
+    ) = create_dataloaders(
 
-    # ========================================================
-    # Create test loader
-    # ========================================================
-
-    print()
-
-    print(
-        "Creating test DataLoader..."
-    )
-
-    _, _, test_loader = create_dataloaders(
         train_dataset,
+
         test_dataset,
-        test_dataset,
+
+        test_dataset
+
     )
 
-    print(
-        f"Test batches: "
-        f"{len(test_loader):,}"
-    )
 
-    # ========================================================
+
     # Create model
-    # ========================================================
+
 
     print()
 
     print(
-        "Creating EfficientNetV2-S model..."
+        "Loading best model..."
     )
+
 
     model = create_model()
 
-    # ========================================================
-    # Load best model
-    # ========================================================
 
-    best_model_path = (
+
+    model_path = (
         MODEL_DIR
-        / "best_model.pth"
+        /
+        "best_model.pth"
     )
 
-    print()
 
-    print(
-        "Loading best model:"
-    )
-
-    print(
-        best_model_path
-    )
 
     model.load_state_dict(
+
         torch.load(
-            best_model_path,
-            map_location=DEVICE,
+            model_path,
+            map_location=DEVICE
         )
+
     )
 
-    # ========================================================
-    # Move model to device
-    # ========================================================
+
 
     model = model.to(
         DEVICE
     )
 
-    # ========================================================
-    # Final evaluation
-    # ========================================================
+
+
+    # Evaluation
+
 
     print()
 
     print(
-        "Evaluating on official FER2013 test set..."
+        "Evaluating..."
     )
+
 
     results = evaluate_model(
-        model=model,
-        test_loader=test_loader,
-        device=DEVICE,
+
+        model,
+
+        test_loader,
+
+        DEVICE
+
     )
 
-    # ========================================================
-    # Display results
-    # ========================================================
+
 
     print()
 
@@ -410,171 +831,63 @@ def main() -> None:
 
     print("=" * 70)
 
-    print()
+
 
     print(
-        f"Test Loss       : "
-        f"{results['test_loss']:.4f}"
-    )
 
-    print(
-        f"Test Accuracy   : "
+        f"Accuracy: "
         f"{results['test_accuracy']:.4f}"
-        f" ({results['test_accuracy'] * 100:.2f}%)"
+
     )
 
-    print(
-        f"Weighted Precision : "
-        f"{results['weighted_precision']:.4f}"
-    )
 
     print(
-        f"Weighted Recall    : "
-        f"{results['weighted_recall']:.4f}"
-    )
 
-    print(
-        f"Weighted F1-score  : "
+        f"F1 Score: "
         f"{results['weighted_f1']:.4f}"
+
     )
 
-    # ========================================================
-    # Classification report
-    # ========================================================
 
-    print()
 
-    print("=" * 70)
+    # Save everything
 
-    print(
-        "CLASSIFICATION REPORT"
+
+    save_json_results(
+        results
     )
 
-    print("=" * 70)
 
-    report = results[
-        "classification_report"
-    ]
-
-    print()
-
-    print(
-        f"{'Class':<12}"
-        f"{'Precision':>12}"
-        f"{'Recall':>12}"
-        f"{'F1-score':>12}"
-        f"{'Support':>12}"
+    save_text_results(
+        results
     )
 
-    print("-" * 60)
 
-    for class_name in CLASS_NAMES:
-
-        class_result = report[
-            class_name
-        ]
-
-        print(
-            f"{class_name:<12}"
-            f"{class_result['precision']:>12.4f}"
-            f"{class_result['recall']:>12.4f}"
-            f"{class_result['f1-score']:>12.4f}"
-            f"{int(class_result['support']):>12}"
-        )
-
-    # ========================================================
-    # Confusion matrix
-    # ========================================================
-
-    print()
-
-    print("=" * 70)
-
-    print(
-        "CONFUSION MATRIX"
+    save_confusion_matrix(
+        results
     )
 
-    print("=" * 70)
+
+    update_excel_tracker(
+        results
+    )
+
+
 
     print()
 
     print(
-        "Classes:"
+        "Evaluation completed."
     )
 
-    print(
-        CLASS_NAMES
-    )
 
-    print()
 
-    for row in results[
-        "confusion_matrix"
-    ]:
-
-        print(row)
-
-    # ========================================================
-    # Save results
-    # ========================================================
-
-    results_dir = (
-        MODEL_DIR.parent
-        / "results"
-    )
-
-    results_dir.mkdir(
-        parents=True,
-        exist_ok=True,
-    )
-
-    results_path = (
-        results_dir
-        / "evaluation_results.json"
-    )
-
-    with open(
-        results_path,
-        "w",
-        encoding="utf-8",
-    ) as file:
-
-        json.dump(
-            results,
-            file,
-            indent=4,
-        )
-
-    # ========================================================
-    # Final message
-    # ========================================================
-
-    print()
-
-    print("=" * 70)
-
-    print(
-        "EVALUATION COMPLETED"
-    )
-
-    print("=" * 70)
-
-    print()
-
-    print(
-        f"Evaluation results saved to:"
-    )
-
-    print(
-        results_path
-    )
-
-    print()
 
 
 # ============================================================
-# 5. RUN MAIN
+# RUN
 # ============================================================
+
 
 if __name__ == "__main__":
 

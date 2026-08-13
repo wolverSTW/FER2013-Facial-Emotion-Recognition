@@ -1,0 +1,49 @@
+Experiment:
+EXP-001 Baseline EfficientNetV2-S
+
+
+FINAL TEST RESULTS
+
+Test Loss:
+1.8210
+
+
+Test Accuracy:
+0.7099
+
+
+Accuracy:
+70.99%
+
+
+Weighted Precision:
+0.7102
+
+
+Weighted Recall:
+0.7099
+
+
+Weighted F1-score:
+0.7090
+
+
+
+Class Performance
+
+
+Class       Precision   Recall   F1
+
+angry       0.6663      0.6086   0.6361
+
+disgust     0.7449      0.6577   0.6986
+
+fear        0.6169      0.5332   0.5720
+
+happy       0.8841      0.8856   0.8848
+
+neutral     0.6324      0.6991   0.6641
+
+sad         0.5784      0.6151   0.5962
+
+surprise    0.8126      0.8351   0.8237

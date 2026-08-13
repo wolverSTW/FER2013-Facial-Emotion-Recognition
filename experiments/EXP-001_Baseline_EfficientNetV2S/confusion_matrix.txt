@@ -1,0 +1,40 @@
+Classes:
+
+[
+angry,
+disgust,
+fear,
+happy,
+neutral,
+sad,
+surprise
+]
+
+
+Confusion Matrix:
+
+
+              Predicted
+
+            angry disgust fear happy neutral sad surprise
+
+
+angry        583    13    91    36     84    137    14
+
+
+disgust       18    73     6     2      2      9     1
+
+
+fear          90     3   546    22     95    195    73
+
+
+happy         23     3    22  1571     92     25    38
+
+
+neutral       61     2    45    74    862    173    16
+
+
+sad           84     4   120    45    209    767    18
+
+
+surprise      16     0    55    27     19     20   694
